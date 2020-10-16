@@ -16,15 +16,19 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+	"strings"
 
-	homedir "github.com/mitchellh/go-homedir"
-	"github.com/spf13/viper"
+	"github.com/spf13/cobra"
 )
 
-var cfgFile string
+var name string
+var greeting string
+var preview bool
+var prompt bool
+var debug bool = false
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -38,7 +42,70 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	Run: func(cmd *cobra.Command, args []string) {
+		// show usage if flags are invalid
+		if prompt == false && (name == "" || greeting == "") {
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		if debug {
+			fmt.Println("Name:", name)
+			fmt.Println("Greeting:", greeting)
+			fmt.Println("Prompt:", prompt)
+			fmt.Println("Preview:", preview)
+
+			os.Exit(0)
+		}
+
+		// Conditionally read from stdin
+		if prompt {
+			name, greeting = renderPrompt()
+		}
+
+		// Generate message
+		message := buildMessage(name, greeting)
+
+		// Either preview the message or write the file
+		if preview {
+			fmt.Println(message)
+		} else {
+			//  write content
+			f, err := os.OpenFile("/etc/motd", os.O_WRONLY, 0644)
+
+			if err != nil {
+				fmt.Println("Error: Unable to open /etc/motd")
+				os.Exit(1)
+			}
+
+			defer f.Close()
+
+			_, err = f.Write([]byte(message))
+
+			if err != nil {
+				fmt.Println("Error: Failed to write to /etc/motd")
+				os.Exit(1)
+			}
+
+		}
+
+	},
+}
+
+func buildMessage(name, greeting string) string {
+	return fmt.Sprintf("%s , %s", greeting, name)
+}
+
+func renderPrompt() (name, greeting string) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Your Greeting: ")
+	greeting, _ = reader.ReadString('\n')
+	greeting = strings.TrimSpace(greeting)
+
+	fmt.Print("Your Name: ")
+	name, _ = reader.ReadString('\n')
+	name = strings.TrimSpace(name)
+	return
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -51,41 +118,12 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.motd.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".motd" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".motd")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	rootCmd.Flags().StringVarP(&name, "name", "n", "", "Name to use in the message")
+	rootCmd.Flags().StringVarP(&greeting, "greeting", "g", "", "Greeting to use in the message")
+	rootCmd.Flags().BoolVarP(&preview, "preview", "v", false, "Preview message instead of writing to /etc/motd")
+	rootCmd.Flags().BoolVarP(&prompt, "prompt", "p", false, "Prompt for name and greeting")
+	if os.Getenv("DEBUG") != "" {
+		debug = true
 	}
 }
