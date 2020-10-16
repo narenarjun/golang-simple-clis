@@ -1,9 +1,9 @@
 # motd cli
 
-```
+```bash
 go run main.go
 ```
-```
+```bash
 Usage:
   motd [flags]
 

@@ -2,10 +2,10 @@
 
 smsg is a simple greet message cli.
 
-```
+```bash
 go run main.go
 ```
-```
+```bash
 Usage of <file Location>:
   -greeting string
         phrase to use within the messgae
